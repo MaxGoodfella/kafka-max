@@ -3,6 +3,8 @@ package com.max.kafka;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.max.consumer_model.Payment;
+import com.max.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -10,6 +12,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Random;
 
 @Slf4j
@@ -20,6 +23,8 @@ public class KafkaConsumer {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
 
+    private final PaymentRepository paymentRepository;
+
     @KafkaListener(topics = "orders", groupId = "payment_service_group")
     public void listen(String message) {
         log.info("Received Message: {}", message);
@@ -29,6 +34,13 @@ public class KafkaConsumer {
         String orderId = extractOrderId(message);
         String paymentStatus = paymentSuccess ? "SUCCESS" : "FAILURE";
         String resultMessage = String.format("order id: %s, payment status: %s", orderId, paymentStatus);
+
+        Payment payment = new Payment();
+        payment.setOrderId(orderId);
+        payment.setStatus(paymentStatus);
+        payment.setMessage(resultMessage);
+        payment.setCreatedAt(LocalDateTime.now());
+        paymentRepository.save(payment);
 
         if (paymentSuccess) {
             kafkaTemplate.send("order-payments", resultMessage);
